@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Base de ajustes CFE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<!-- ── HEADER ─────────────────────────────────────── -->
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <svg class="brand-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M9 1L2 9h6l-1 6 7-8H8l1-6z" fill="currentColor"/>
+      </svg>
+      <span class="brand-name">Base de ajustes CFE</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">Telcel</span>
+    </div>
+    <div id="conn-badge" class="conn-badge">Sin conexión</div>
+  </div>
+</header>
+
+<!-- ── LAYOUT ─────────────────────────────────────── -->
+<div class="layout">
+
+  <!-- PANEL IZQUIERDO: controles -->
+  <aside class="panel-left">
+
+    <!-- 1. Archivo -->
+    <section class="control-group" id="group-file">
+      <p class="group-label">Archivo</p>
+
+      <div class="dropzone" id="dropzone">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" class="dz-icon">
+          <path d="M10 3v9m0-9L7 6m3-3l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span class="dz-text">Arrastra o <u>selecciona</u> un archivo</span>
+        <span class="dz-hint">.xlsx · .xlsm · .xls</span>
+        <input type="file" id="file-input" accept=".xlsx,.xlsm,.xls" hidden />
+      </div>
+
+      <div id="file-info" class="file-chip hidden">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="2" y="1" width="8" height="12" rx="1" stroke="currentColor" stroke-width="1.2"/>
+          <path d="M4 5h6M4 7h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        <span id="file-name-label" class="chip-name"></span>
+        <button class="chip-remove" id="btn-change-file" title="Quitar archivo">✕</button>
+      </div>
+
+      <div id="upload-error" class="inline-error hidden"></div>
+
+      <button class="btn btn-primary" id="btn-leer-pestanas" disabled>
+        Leer pestañas
+      </button>
+    </section>
+
+    <!-- 2. Pestaña -->
+    <section class="control-group hidden" id="group-sheet">
+      <p class="group-label">Pestaña</p>
+      <div id="sheet-list" class="sheet-list"></div>
+      <div id="sheet-error" class="inline-error hidden"></div>
+      <button class="btn btn-primary" id="btn-preview" disabled>
+        Ver datos
+      </button>
+    </section>
+
+    <!-- 3. Año -->
+    <section class="control-group hidden" id="group-year">
+      <p class="group-label">Año del ajuste</p>
+      <p class="group-hint">Se guardará en el campo <code>Year</code> de cada registro.</p>
+      <div class="year-picker" id="year-picker"></div>
+    </section>
+
+    <!-- 4. Acción -->
+    <section class="control-group hidden" id="group-action">
+      <p class="group-label">Carga a HANA</p>
+      <div class="summary-mini" id="summary-mini"></div>
+      <button class="btn btn-danger" id="btn-cargar" disabled>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M7 1.5L1 7.5h4.5L4 12.5l8-7H7.5L9 1.5z" fill="currentColor"/>
+        </svg>
+        Iniciar carga
+      </button>
+    </section>
+
+  </aside>
+
+  <!-- PANEL DERECHO: preview + resultado -->
+  <main class="panel-right">
+
+    <!-- Estado vacío -->
+    <div class="panel-empty" id="panel-empty">
+      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" opacity=".25">
+        <rect x="6" y="4" width="22" height="30" rx="2" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M10 12h14M10 17h10M10 22h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M30 26l6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="27" cy="23" r="5" stroke="currentColor" stroke-width="1.5"/>
+      </svg>
+      <p>Selecciona un archivo y una pestaña<br>para ver la vista previa aquí.</p>
+    </div>
+
+    <!-- Spinner de preview -->
+    <div class="panel-loading hidden" id="preview-spinner">
+      <div class="spinner"></div>
+      <span>Leyendo datos…</span>
+    </div>
+
+    <!-- Tabla de preview -->
+    <div class="preview-area hidden" id="preview-area">
+      <div class="preview-topbar" id="preview-meta"></div>
+      <div class="table-scroll">
+        <table class="data-table" id="preview-table">
+          <thead id="preview-thead"></thead>
+          <tbody id="preview-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Barra de progreso de carga -->
+    <div class="progress-overlay hidden" id="progress-wrap">
+      <div class="progress-inner">
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progress-bar"></div>
+        </div>
+        <p id="progress-msg" class="progress-msg">Iniciando…</p>
+      </div>
+    </div>
+
+    <!-- Resultado de carga -->
+    <div class="result-area hidden" id="load-result"></div>
+
+    <!-- Error de carga -->
+    <div id="load-error" class="panel-error hidden"></div>
+
+    <!-- Error de preview -->
+    <div id="preview-error" class="panel-error hidden"></div>
+
+  </main>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
