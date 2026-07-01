@@ -17,8 +17,38 @@ BATCH_SIZE = 100
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# CONFIGURACIÓN — VCAP_SERVICES (Cloud Foundry) o .env local
+# CONFIGURACIÓN — VCAP_SERVICES (Cloud Foundry, servicio user-provided) o .env local
 # ════════════════════════════════════════════════════════════════════════════
+#
+# En ambos entornos las credenciales usan los mismos nombres de clave:
+# HANA_HOST, HANA_PORT, HANA_USER, HANA_PASSWORD, HANA_SCHEMA,
+# BillingAdjustmentTable. En CF llegan dentro de un servicio "user-provided"
+# (no "hana"), así que la búsqueda en VCAP_SERVICES se hace por la FORMA de
+# las credenciales, no por el nombre del servicio.
+
+
+def _get_user_provided_credentials() -> dict | None:
+    """
+    Busca en VCAP_SERVICES el binding user-provided que contenga las
+    credenciales HANA_*. Retorna el dict de credentials o None si no existe.
+    """
+    vcap_raw = os.environ.get("VCAP_SERVICES")
+    if not vcap_raw:
+        return None
+
+    try:
+        vcap = json.loads(vcap_raw)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"VCAP_SERVICES no es JSON válido: {e}")
+
+    for service_name, bindings in vcap.items():
+        for binding in bindings:
+            creds = binding.get("credentials", {})
+            if creds.get("HANA_HOST") and creds.get("HANA_USER") and creds.get("HANA_PASSWORD"):
+                log.info(f"Credenciales HANA encontradas en servicio '{service_name}'")
+                return creds
+
+    return None
 
 
 def get_table_name() -> str:
@@ -26,24 +56,19 @@ def get_table_name() -> str:
     Lee el nombre completo de la tabla destino.
     Prioridad:
       1. Variable de entorno BillingAdjustmentTable (en .env local o CF env vars)
-      2. Credenciales dentro de VCAP_SERVICES (user-provided-service)
+      2. Credenciales dentro de VCAP_SERVICES (servicio user-provided)
     """
     tabla = os.environ.get("BillingAdjustmentTable")
     if tabla:
         return tabla.strip()
 
-    vcap_raw = os.environ.get("VCAP_SERVICES")
-    if vcap_raw:
-        vcap = json.loads(vcap_raw)
-        for _, bindings in vcap.items():
-            for binding in bindings:
-                creds = binding.get("credentials", {})
-                if "BillingAdjustmentTable" in creds:
-                    return creds["BillingAdjustmentTable"].strip()
+    creds = _get_user_provided_credentials()
+    if creds and creds.get("BillingAdjustmentTable"):
+        return creds["BillingAdjustmentTable"].strip()
 
     raise RuntimeError(
         "No se encontró BillingAdjustmentTable en el entorno. "
-        "Verifica tu .env o las variables de la app en CF."
+        "Verifica tu .env o el servicio user-provided en CF."
     )
 
 
@@ -51,59 +76,54 @@ def get_hana_connection():
     """
     Devuelve una conexión hdbcli activa.
     Prioridad:
-      1. VCAP_SERVICES (Cloud Foundry / SAP BTP)
-      2. Variables de entorno locales (.env)
+      1. Variables de entorno locales ya definidas (.env)
+      2. VCAP_SERVICES (Cloud Foundry / SAP BTP) — servicio user-provided
     """
     try:
         from hdbcli import dbapi
     except ImportError:
         raise RuntimeError("hdbcli no está instalado. Ejecuta: pip install hdbcli")
 
-    vcap_raw = os.environ.get("VCAP_SERVICES")
-    if vcap_raw:
-        log.info("Detectado VCAP_SERVICES — usando credenciales de CF")
-        vcap = json.loads(vcap_raw)
+    host = os.environ.get("HANA_HOST")
+    port = os.environ.get("HANA_PORT")
+    user = os.environ.get("HANA_USER")
+    password = os.environ.get("HANA_PASSWORD")
+    schema = os.environ.get("HANA_SCHEMA")
 
-        hana_creds = None
-        for service_name, bindings in vcap.items():
-            if "hana" in service_name.lower():
-                hana_creds = bindings[0]["credentials"]
-                break
+    if not all([host, user, password]):
+        log.info("Variables locales incompletas — buscando en VCAP_SERVICES")
+        creds = _get_user_provided_credentials()
 
-        if not hana_creds:
+        if not creds:
+            vcap_raw = os.environ.get("VCAP_SERVICES")
+            disponibles = list(json.loads(vcap_raw).keys()) if vcap_raw else []
             raise RuntimeError(
-                "No se encontró un servicio HANA en VCAP_SERVICES. "
-                "Verifica el binding en SAP BTP."
+                "No se encontró un binding user-provided con credenciales "
+                f"HANA_HOST/HANA_USER/HANA_PASSWORD. Servicios disponibles: {disponibles}"
             )
 
-        host = hana_creds.get("host")
-        port = int(hana_creds.get("port", 443))
-        user = hana_creds.get("user")
-        password = hana_creds.get("password")
-        schema = hana_creds.get("schema", "")
-    else:
-        log.info("Usando credenciales locales (.env)")
-        host = os.environ.get("HANA_HOST")
-        port = int(os.environ.get("HANA_PORT", 443))
-        user = os.environ.get("HANA_USER")
-        password = os.environ.get("HANA_PASSWORD")
-        schema = os.environ.get("HANA_SCHEMA", "")
+        host = creds.get("HANA_HOST")
+        port = creds.get("HANA_PORT")
+        user = creds.get("HANA_USER")
+        password = creds.get("HANA_PASSWORD")
+        schema = creds.get("HANA_SCHEMA")
 
-        if not all([host, user, password]):
-            raise RuntimeError(
-                "Faltan variables HANA_HOST / HANA_USER / HANA_PASSWORD en .env"
-            )
+    if not all([host, user, password]):
+        raise RuntimeError(
+            "Faltan variables HANA_HOST / HANA_USER / HANA_PASSWORD. "
+            "Verifica tu .env local o el servicio user-provided en Cloud Foundry."
+        )
 
     conn = dbapi.connect(
         address=host,
-        port=port,
+        port=int(port) if port else 443,
         user=user,
         password=password,
         encrypt=True,
         sslValidateCertificate=False,
         currentSchema=schema if schema else None,
     )
-    log.info(f"Conexión HANA establecida → {host}:{port}")
+    log.info(f"Conexión HANA establecida → {host}:{port or 443}")
     return conn
 
 
