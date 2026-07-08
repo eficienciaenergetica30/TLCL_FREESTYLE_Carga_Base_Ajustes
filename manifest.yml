@@ -10,7 +10,7 @@ applications:
     health-check-type: http
     health-check-http-endpoint: /
     env:
-      FLASK_ENV: dev
-      ENVIRONMENT: dev
+      FLASK_ENV: prd
+      ENVIRONMENT: prd
       PYTHONUNBUFFERED: "true"
       HTTP_TIMEOUT: "120"
