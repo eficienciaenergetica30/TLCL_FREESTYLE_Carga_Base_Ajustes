@@ -3,7 +3,7 @@
 # Deployment de Carga de Ajustes CFE
 # ───────────────────────────────────────────────────────────────
 applications:
-  - name: carga-base-ajustes-cfe-dev
+  - name: carga-base-ajustes-cfe-prd
     memory: 1024M  # Aumentado de 512M (recomendado para procesar Excel)
     buildpack: python_buildpack
     command: gunicorn -w 4 app:app --bind 0.0.0.0:$PORT --timeout 120
