@@ -1,0 +1,81 @@
+name: Replace Dev App Name with PRD on Carga Base Ajustes CFE
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  replace-app-name:
+    # Solo correr si el PR realmente se mergeó (no si se cerró sin mergear)
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main          # Se para en main real, no en el merge commit de prueba del PR
+          fetch-depth: 0
+
+      - name: Verify manifest.yml exists in root
+        run: |
+          if [ ! -f "manifest.yml" ]; then
+            echo "::error::No se encontró manifest.yml en la raíz del repo. Archivos manifest.yml encontrados en el repo:"
+            find . -name "manifest.yml"
+            exit 1
+          fi
+
+      - name: Replace app name DEV → PRD
+        run: |
+          BEFORE=$(grep -c "name: carga-base-ajustes-cfe-dev" manifest.yml || true)
+          echo "Ocurrencias de 'name: carga-base-ajustes-cfe-dev' encontradas: $BEFORE"
+
+          if [ "$BEFORE" -eq 0 ]; then
+            echo "::error::No se encontró 'name: carga-base-ajustes-cfe-dev' en manifest.yml. Revisa el archivo (¿ya está en PRD? ¿cambió el nombre?)."
+            echo "Línea 'name:' actual en el archivo:"
+            grep -n "^\s*- name:" manifest.yml || echo "No se encontró ninguna línea 'name:'"
+            exit 1
+          fi
+
+          if [ "$BEFORE" -gt 1 ]; then
+            echo "::warning::Se encontraron $BEFORE ocurrencias, se esperaba solo 1. Se reemplazarán todas."
+          fi
+
+          sed -i 's/name: carga-base-ajustes-cfe-dev/name: carga-base-ajustes-cfe-prd/g' manifest.yml
+
+          AFTER=$(grep -c "name: carga-base-ajustes-cfe-dev" manifest.yml || true)
+          if [ "$AFTER" -ne 0 ]; then
+            echo "::error::Quedaron $AFTER referencias a 'carga-base-ajustes-cfe-dev' después del reemplazo"
+            exit 1
+          fi
+
+          VERIFY=$(grep -c "name: carga-base-ajustes-cfe-prd" manifest.yml || true)
+          if [ "$VERIFY" -eq 0 ]; then
+            echo "::error::El reemplazo no dejó ninguna línea con 'name: carga-base-ajustes-cfe-prd'"
+            exit 1
+          fi
+
+          echo "✅ manifest.yml actualizado: name pasó de dev a prd correctamente"
+
+      - name: Show diff for review
+        run: |
+          echo "----- DIFF -----"
+          git diff manifest.yml
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add manifest.yml
+
+          if git diff --staged --quiet; then
+            echo "::warning::No hay cambios para commitear en manifest.yml"
+            exit 0
+          fi
+
+          git commit -m "[Automated] Replaced DEV app name with PRD in manifest.yml"
+          git push origin HEAD:main
