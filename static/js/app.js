@@ -409,9 +409,14 @@ function bloquearPanelIzquierdo() {
   if (panel) panel.classList.add("panel-blocked");
 }
 
+let _hubCountdownInterval = null;
+let _hubReloadTimeout = null;
+
 function iniciarCuentaRegresivaYRecargar() {
   let restante = Math.ceil(HUB_RELOAD_DELAY_MS / 1000);
   const countdownEl = document.getElementById("hub-countdown");
+  const btnPausar = document.getElementById("hub-btn-pausar");
+  const btnTerminar = document.getElementById("hub-btn-terminar");
 
   const tick = () => {
     if (countdownEl) {
@@ -420,30 +425,57 @@ function iniciarCuentaRegresivaYRecargar() {
     restante -= 1;
   };
 
+  const detenerReinicio = () => {
+    clearInterval(_hubCountdownInterval);
+    clearTimeout(_hubReloadTimeout);
+    if (countdownEl) {
+      countdownEl.textContent = "Reinicio automático detenido. Puede revisar el resumen con calma.";
+    }
+    if (btnPausar) {
+      btnPausar.disabled = true;
+      btnPausar.textContent = "Reinicio detenido";
+    }
+  };
+
+  // Arranca el conteo
   tick();
-  const interval = setInterval(() => {
+  _hubCountdownInterval = setInterval(() => {
     if (restante < 0) {
-      clearInterval(interval);
+      clearInterval(_hubCountdownInterval);
       return;
     }
     tick();
   }, 1000);
 
-  setTimeout(() => {
+  _hubReloadTimeout = setTimeout(() => {
     window.location.reload();
   }, HUB_RELOAD_DELAY_MS);
+
+  // Botón: detener el contador
+  if (btnPausar) {
+    btnPausar.addEventListener("click", detenerReinicio);
+  }
+
+  // Botón: terminar ahora (reinicia de inmediato)
+  if (btnTerminar) {
+    btnTerminar.addEventListener("click", () => {
+      clearInterval(_hubCountdownInterval);
+      clearTimeout(_hubReloadTimeout);
+      window.location.reload();
+    });
+  }
 }
 
 
 function buildHubAlertHtml(variant, message) {
   const icons = {
-    ok:     `<circle cx="9" cy="9" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 9l2.5 2.5 4.5-4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`,
-    warn:   `<path d="M9 2L16.5 15.5H1.5L9 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 6.5v3.5M9 12.5h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>`,
+    ok: `<circle cx="9" cy="9" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 9l2.5 2.5 4.5-4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`,
+    warn: `<path d="M9 2L16.5 15.5H1.5L9 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 6.5v3.5M9 12.5h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>`,
     danger: `<circle cx="9" cy="9" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 6.5l5 5M11.5 6.5l-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>`,
   };
   const labels = {
-    ok:     "Proceso finalizado",
-    warn:   "Finalizado con advertencia",
+    ok: "Proceso finalizado",
+    warn: "Finalizado con advertencia",
     danger: "No se pudo confirmar el proceso",
   };
 
@@ -454,6 +486,14 @@ function buildHubAlertHtml(variant, message) {
         <strong>${labels[variant]}</strong>
         <p>${escHtml(message)}</p>
         <p class="hub-countdown" id="hub-countdown"></p>
+        <div class="hub-actions">
+          <button class="btn btn-secondary btn-sm" id="hub-btn-pausar" type="button">
+            Detener reinicio
+          </button>
+          <button class="btn btn-primary btn-sm" id="hub-btn-terminar" type="button">
+            Terminar
+          </button>
+        </div>
       </div>
     </div>
   `;
