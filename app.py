@@ -27,6 +27,8 @@ log = logging.getLogger(__name__)
 
 # ── Endpoint del hub TLCL (notificación final de ejecución) ─────────────────
 # HUB_NOTIFY_URL  = os.environ.get("HubNotifyUrl", "http://localhost:5000/tlcl-hub/tlcl12")
+
+# Esta url se cambia a cf env
 HUB_NOTIFY_URL  = os.environ.get("HubNotifyUrl")
 HUB_NOTIFY_USER = "BASE_AJUSTES_USER"
 

@@ -369,7 +369,7 @@ DOM.btnCargar.addEventListener("click", async () => {
    NOTIFICACIÓN FINAL AL HUB TLCL
    ══════════════════════════════════════════════════════ */
 
-const HUB_RELOAD_DELAY_MS = 8000; // segundos antes de reiniciar la pantalla
+const HUB_RELOAD_DELAY_MS = 13000; // segundos antes de reiniciar la pantalla
 
 async function finalizarConHub() {
   const hubEl = document.getElementById("hub-status");

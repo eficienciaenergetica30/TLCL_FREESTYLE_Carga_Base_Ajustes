@@ -6,3 +6,5 @@
 
 /{templates,static
 /__pycache__
+
+main.yml
