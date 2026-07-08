@@ -1,0 +1,11 @@
+# .pipeline/config.yml
+general:
+  buildTool: 'custom' # Le dice a BTP que no busque ni mta.yaml ni maven/npm estándar
+
+steps:
+  cloudFoundryDeploy:
+    cloudFoundry:
+      org: 'TELCL'
+      space: 'PRD' # Ej. dev o prod
+      credentialsId: 'cloud-foundry-ee-credentials'
+    manifest: 'manifest.yml'
