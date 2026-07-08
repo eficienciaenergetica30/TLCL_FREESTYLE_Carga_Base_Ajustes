@@ -1,4 +1,4 @@
-name: Replace Dev App Name with PRD on Carga Base Ajustes CFE
+name: Replace Dev Values with PRD on Carga Base Ajustes CFE
 
 on:
   pull_request:
@@ -61,6 +61,31 @@ jobs:
 
           echo "✅ manifest.yml actualizado: name pasó de dev a prd correctamente"
 
+      - name: Replace FLASK_ENV and ENVIRONMENT DEV → PRD
+        run: |
+          BEFORE_FLASK=$(grep -Ec "FLASK_ENV:[[:space:]]*dev" manifest.yml || true)
+          BEFORE_ENVIRONMENT=$(grep -Ec "ENVIRONMENT:[[:space:]]*dev" manifest.yml || true)
+          echo "Ocurrencias encontradas -> FLASK_ENV: dev: $BEFORE_FLASK, ENVIRONMENT: dev: $BEFORE_ENVIRONMENT"
+
+          if [ "$BEFORE_FLASK" -eq 0 ] && [ "$BEFORE_ENVIRONMENT" -eq 0 ]; then
+            echo "::error::No se encontró 'FLASK_ENV: dev' ni 'ENVIRONMENT: dev' en manifest.yml. Revisa el archivo."
+            grep -n "FLASK_ENV:\|ENVIRONMENT:" manifest.yml || echo "No se encontraron esas claves en el archivo"
+            exit 1
+          fi
+
+          sed -i -E 's/FLASK_ENV:[[:space:]]*dev/FLASK_ENV: prd/g' manifest.yml
+          sed -i -E 's/ENVIRONMENT:[[:space:]]*dev/ENVIRONMENT: prd/g' manifest.yml
+
+          AFTER_FLASK=$(grep -Ec "FLASK_ENV:[[:space:]]*dev" manifest.yml || true)
+          AFTER_ENVIRONMENT=$(grep -Ec "ENVIRONMENT:[[:space:]]*dev" manifest.yml || true)
+
+          if [ "$AFTER_FLASK" -ne 0 ] || [ "$AFTER_ENVIRONMENT" -ne 0 ]; then
+            echo "::error::Quedaron referencias sin reemplazar -> FLASK_ENV: dev: $AFTER_FLASK, ENVIRONMENT: dev: $AFTER_ENVIRONMENT"
+            exit 1
+          fi
+
+          echo "✅ manifest.yml actualizado: FLASK_ENV y ENVIRONMENT pasaron de dev a prd correctamente"
+
       - name: Show diff for review
         run: |
           echo "----- DIFF -----"
@@ -77,5 +102,5 @@ jobs:
             exit 0
           fi
 
-          git commit -m "[Automated] Replaced DEV app name with PRD in manifest.yml"
+          git commit -m "[Automated] Replaced DEV values (name, FLASK_ENV, ENVIRONMENT) with PRD in manifest.yml"
           git push origin HEAD:main
