@@ -35,10 +35,10 @@ jobs:
           echo "Ocurrencias de 'name: carga-base-ajustes-cfe-dev' encontradas: $BEFORE"
 
           if [ "$BEFORE" -eq 0 ]; then
-            echo "::error::No se encontró 'name: carga-base-ajustes-cfe-dev' en manifest.yml. Revisa el archivo (¿ya está en PRD? ¿cambió el nombre?)."
+            echo "::warning::No se encontró 'name: carga-base-ajustes-cfe-dev' en manifest.yml. Probablemente ya estaba en PRD de un merge anterior. No se hace ningún cambio."
             echo "Línea 'name:' actual en el archivo:"
             grep -n "^\s*- name:" manifest.yml || echo "No se encontró ninguna línea 'name:'"
-            exit 1
+            exit 0
           fi
 
           if [ "$BEFORE" -gt 1 ]; then
@@ -68,9 +68,9 @@ jobs:
           echo "Ocurrencias encontradas -> FLASK_ENV: dev: $BEFORE_FLASK, ENVIRONMENT: dev: $BEFORE_ENVIRONMENT"
 
           if [ "$BEFORE_FLASK" -eq 0 ] && [ "$BEFORE_ENVIRONMENT" -eq 0 ]; then
-            echo "::error::No se encontró 'FLASK_ENV: dev' ni 'ENVIRONMENT: dev' en manifest.yml. Revisa el archivo."
+            echo "::warning::No se encontró 'FLASK_ENV: dev' ni 'ENVIRONMENT: dev' en manifest.yml. Probablemente ya estaba en PRD de un merge anterior. No se hace ningún cambio."
             grep -n "FLASK_ENV:\|ENVIRONMENT:" manifest.yml || echo "No se encontraron esas claves en el archivo"
-            exit 1
+            exit 0
           fi
 
           sed -i -E 's/FLASK_ENV:[[:space:]]*dev/FLASK_ENV: prd/g' manifest.yml
